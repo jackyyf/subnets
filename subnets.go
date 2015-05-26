@@ -6,7 +6,7 @@ import (
 
 type bitset []byte
 type elem struct {
-	val  *MatchNode
+	val  *matchNode
 	next *elem
 }
 
@@ -20,12 +20,12 @@ func newStack() *stack {
 	}
 }
 
-func (s *stack) Push(val *MatchNode) {
+func (s *stack) Push(val *matchNode) {
 	s.elem = &elem{val, s.elem}
 }
 
-func (s *stack) Pop() *MatchNode {
-	var val *MatchNode
+func (s *stack) Pop() *matchNode {
+	var val *matchNode
 	val, s.elem = s.elem.val, s.elem.next
 	return val
 }
@@ -40,14 +40,14 @@ func (s bitset) Get(idx int) int {
 	}
 }
 
-type MatchNode struct {
+type matchNode struct {
 	Full  bool
-	Child [2]*MatchNode
+	Child [2]*matchNode
 }
 
 type Matcher struct {
 	limit int
-	root  *MatchNode
+	root  *matchNode
 }
 
 type IPv4Matcher struct {
@@ -62,7 +62,7 @@ func Newv4Matcher() *IPv4Matcher {
 	return &IPv4Matcher{
 		Matcher: Matcher{
 			limit: 32,
-			root:  new(MatchNode),
+			root:  new(matchNode),
 		},
 	}
 }
@@ -71,7 +71,7 @@ func Newv6Matcher() *IPv6Matcher {
 	return &IPv6Matcher{
 		Matcher: Matcher{
 			limit: 128,
-			root:  new(MatchNode),
+			root:  new(matchNode),
 		},
 	}
 }
@@ -103,7 +103,7 @@ func (me *Matcher) Add(ip bitset, plen int) {
 		s.Push(now)
 		next := ip.Get(idx)
 		if now.Child[next] == nil {
-			now.Child[next] = new(MatchNode)
+			now.Child[next] = new(matchNode)
 		}
 		now = now.Child[next]
 	}
