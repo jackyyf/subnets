@@ -5,29 +5,32 @@ import (
 )
 
 type bitset []byte
-type elem struct {
-	val  *matchNode
-	next *elem
-}
 
 type stack struct {
-	*elem
+	data []*matchNode
+	idx  int
 }
 
-func newStack() *stack {
+func newStack(size int) *stack {
 	return &stack{
-		elem: new(elem),
+		data: make([]*matchNode, size),
+		idx:  -1,
 	}
 }
 
 func (s *stack) Push(val *matchNode) {
-	s.elem = &elem{val, s.elem}
+	s.idx++
+	s.data[s.idx] = val
 }
 
-func (s *stack) Pop() *matchNode {
-	var val *matchNode
-	val, s.elem = s.elem.val, s.elem.next
-	return val
+func (s *stack) Pop() (ret *matchNode) {
+	ret = s.data[s.idx]
+	s.idx--
+	return
+}
+
+func (s *stack) Clear() {
+	s.idx = -1
 }
 
 func (s bitset) Get(idx int) int {
@@ -35,9 +38,8 @@ func (s bitset) Get(idx int) int {
 	bmask := byte(128 >> uint(idx&7))
 	if s[bdx]&bmask != 0 {
 		return 1
-	} else {
-		return 0
 	}
+	return 0
 }
 
 type matchNode struct {
@@ -45,38 +47,50 @@ type matchNode struct {
 	Child [2]*matchNode
 }
 
-type Matcher struct {
+type matcher struct {
 	limit int
 	root  *matchNode
+	stack *stack
 }
 
 type IPv4Matcher struct {
-	Matcher
+	matcher
 }
 
 type IPv6Matcher struct {
-	Matcher
+	matcher
+}
+
+var pool []matchNode
+
+func newNode() (ret *matchNode) {
+	if len(pool) == 0 {
+		pool = make([]matchNode, 1024)
+	}
+	ret = &pool[0]
+	pool = pool[1:]
+	return
 }
 
 func Newv4Matcher() *IPv4Matcher {
 	return &IPv4Matcher{
-		Matcher: Matcher{
+		matcher: matcher{
 			limit: 32,
-			root:  new(matchNode),
+			root:  newNode(),
 		},
 	}
 }
 
 func Newv6Matcher() *IPv6Matcher {
 	return &IPv6Matcher{
-		Matcher: Matcher{
+		matcher: matcher{
 			limit: 128,
-			root:  new(matchNode),
+			root:  newNode(),
 		},
 	}
 }
 
-func (me *Matcher) Match(ip bitset) bool {
+func (me *matcher) Match(ip bitset) bool {
 	now := me.root
 	for idx := 0; idx < me.limit; idx++ {
 		if now.Full {
@@ -91,10 +105,14 @@ func (me *Matcher) Match(ip bitset) bool {
 	return false
 }
 
-func (me *Matcher) Add(ip bitset, plen int) {
+func (me *matcher) Add(ip bitset, plen int) {
 	now := me.root
 	// Go down to add entry.
-	s := newStack()
+	if me.stack == nil {
+		me.stack = newStack(me.limit)
+	}
+	s := me.stack
+	s.Clear()
 	for idx := 0; idx < plen; idx++ {
 		if now.Full {
 			// Do not go further, since the subnet is covered.
@@ -103,7 +121,7 @@ func (me *Matcher) Add(ip bitset, plen int) {
 		s.Push(now)
 		next := ip.Get(idx)
 		if now.Child[next] == nil {
-			now.Child[next] = new(matchNode)
+			now.Child[next] = newNode()
 		}
 		now = now.Child[next]
 	}
@@ -124,28 +142,28 @@ func (me *IPv4Matcher) Match(ipv4 net.IP) bool {
 	if len(ipv4) != net.IPv4len {
 		return false
 	}
-	return me.Matcher.Match(bitset(ipv4))
+	return me.matcher.Match(bitset(ipv4))
 }
 
 func (me *IPv4Matcher) Add(ipv4 net.IP, plen int) {
-	if len(ipv4) != net.IPv4len || plen > net.IPv4len {
+	if len(ipv4) != net.IPv4len || plen > net.IPv4len<<3 {
 		return
 	}
-	me.Matcher.Add(bitset(ipv4), plen)
+	me.matcher.Add(bitset(ipv4), plen)
 }
 
 func (me *IPv6Matcher) Match(ipv6 net.IP) bool {
 	if len(ipv6) != net.IPv6len {
 		return false
 	}
-	return me.Matcher.Match(bitset(ipv6))
+	return me.matcher.Match(bitset(ipv6))
 }
 
 func (me *IPv6Matcher) Add(ipv6 net.IP, plen int) {
-	if len(ipv6) != net.IPv6len || plen > net.IPv6len {
+	if len(ipv6) != net.IPv6len || plen > net.IPv6len<<3 {
 		return
 	}
-	me.Matcher.Add(bitset(ipv6), plen)
+	me.matcher.Add(bitset(ipv6), plen)
 }
 
 func (me *IPv4Matcher) AddNet(ipnet *net.IPNet) {
@@ -155,7 +173,7 @@ func (me *IPv4Matcher) AddNet(ipnet *net.IPNet) {
 	if ones, bits := ipnet.Mask.Size(); len(ipnet.IP) != net.IPv4len || (ones == 0 && bits == 0) || bits != net.IPv4len<<3 {
 		return
 	} else {
-		me.Matcher.Add(bitset(ipnet.IP), ones)
+		me.matcher.Add(bitset(ipnet.IP), ones)
 	}
 }
 
@@ -166,6 +184,6 @@ func (me *IPv6Matcher) AddNet(ipnet *net.IPNet) {
 	if ones, bits := ipnet.Mask.Size(); len(ipnet.IP) != net.IPv6len || (ones == 0 && bits == 0) || bits != net.IPv6len<<3 {
 		return
 	} else {
-		me.Matcher.Add(bitset(ipnet.IP), ones)
+		me.matcher.Add(bitset(ipnet.IP), ones)
 	}
 }

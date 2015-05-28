@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net"
+	"strings"
 	"testing"
 )
 
@@ -21,8 +22,8 @@ func getChnRoute(b *testing.B) (ret *IPv4Matcher) {
 	}
 	reader := bufio.NewReader(bytes.NewReader(chnroute))
 	b.StartTimer()
-	for line, err := reader.ReadBytes('\n'); err == nil; line, err = reader.ReadBytes('\n') {
-		ret.AddNet(parseIPNet(string(line)))
+	for line, err := reader.ReadString('\n'); err == nil; line, err = reader.ReadString('\n') {
+		ret.AddNet(parseIPNet(strings.TrimRight(line, "\n")))
 	}
 	b.StopTimer()
 	return
@@ -36,8 +37,8 @@ func getChnRoute6(b *testing.B) (ret *IPv6Matcher) {
 	}
 	reader := bufio.NewReader(bytes.NewReader(chnroute))
 	b.StartTimer()
-	for line, err := reader.ReadBytes('\n'); err == nil; line, err = reader.ReadBytes('\n') {
-		ret.AddNet(parseIPNet(string(line)))
+	for line, err := reader.ReadString('\n'); err == nil; line, err = reader.ReadString('\n') {
+		ret.AddNet(parseIPNet(strings.TrimRight(line, "\n")))
 	}
 	b.StopTimer()
 	return
@@ -213,7 +214,6 @@ func BenchmarkChnRoute(b *testing.B) {
 			r.Match(ip4)
 		}
 	}
-	b.ReportAllocs()
 }
 
 func BenchmarkChnRoute6(b *testing.B) {
@@ -221,13 +221,75 @@ func BenchmarkChnRoute6(b *testing.B) {
 	for i := 0; i < RandSize; i++ {
 		test_ip6s[i] = randomV6()
 	}
-	b.ResetTimer()
 	b.StopTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		r := getChnRoute6(b)
 		for _, ip6 := range test_ip6s {
 			r.Match(ip6)
 		}
 	}
-	b.ReportAllocs()
+}
+
+func BenchmarkSubnetsGfwIP(b *testing.B) {
+	r := getChnRoute(b)
+	banfile, err := ioutil.ReadFile("testdata/gfw-fakeip.txt")
+	if err != nil {
+		b.Error("No testdata: gfw-fakeip.txt")
+	}
+	reader := bufio.NewReader(bytes.NewReader(banfile))
+	banlist := make([]net.IP, 0, 8192)
+	for line, err := reader.ReadString('\n'); err == nil; line, err = reader.ReadString('\n') {
+		banlist = append(banlist, net.ParseIP(strings.TrimRight(line, "\n")).To4())
+	}
+	b.ResetTimer()
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		for _, banip := range banlist {
+			if r.Match(banip) {
+				b.Logf("China IP %s is in gfw fake ip. Correct?", banip.String())
+			}
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkNaiveGfwIP(b *testing.B) {
+	chnroute, err := ioutil.ReadFile("testdata/chnroute.txt")
+	if err != nil {
+		b.Error("No testdata: chnroute.txt")
+	}
+	reader := bufio.NewReader(bytes.NewReader(chnroute))
+	b.StartTimer()
+	nets := make([]*net.IPNet, 0, 8192)
+	for line, err := reader.ReadString('\n'); err == nil; line, err = reader.ReadString('\n') {
+		net := parseIPNet(strings.TrimRight(line, "\n"))
+		if net != nil {
+			nets = append(nets, net)
+		}
+	}
+	b.Logf("%d entries in chnroute", len(nets))
+	banfile, err := ioutil.ReadFile("testdata/gfw-fakeip.txt")
+	if err != nil {
+		b.Error("No testdata: gfw-fakeip.txt")
+	}
+	reader = bufio.NewReader(bytes.NewReader(banfile))
+	banlist := make([]net.IP, 0, 8192)
+	for line, err := reader.ReadString('\n'); err == nil; line, err = reader.ReadString('\n') {
+		banlist = append(banlist, net.ParseIP(strings.TrimRight(line, "\n")).To4())
+	}
+	b.Logf("%d entries in banlist", len(banlist))
+	b.ResetTimer()
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		for _, banip := range banlist {
+			for _, net := range nets {
+				if net.Contains(banip) {
+					b.Logf("China IP %s is in gfw fake ip. Correct?", banip.String())
+					break
+				}
+			}
+		}
+	}
+	b.StopTimer()
 }
