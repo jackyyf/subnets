@@ -53,10 +53,12 @@ type matcher struct {
 	stack *stack
 }
 
+// Matcher for ipv4 address space
 type IPv4Matcher struct {
 	matcher
 }
 
+// Matcher for ipv6 address space
 type IPv6Matcher struct {
 	matcher
 }
@@ -72,6 +74,7 @@ func newNode() (ret *matchNode) {
 	return
 }
 
+// Create a new empty matcher for ipv4 address space.
 func Newv4Matcher() *IPv4Matcher {
 	return &IPv4Matcher{
 		matcher: matcher{
@@ -81,6 +84,7 @@ func Newv4Matcher() *IPv4Matcher {
 	}
 }
 
+// Create a new empty matcher for ipv6 address space.
 func Newv6Matcher() *IPv6Matcher {
 	return &IPv6Matcher{
 		matcher: matcher{
@@ -138,6 +142,8 @@ func (me *matcher) Add(ip bitset, plen int) {
 	}
 }
 
+// Try to match an IPv4 address, returns true if the address is in one of its subnet, false otherwise.
+// NOTE: please use 4 byte net.IP, net.IP4 returns 16 byte version, which can be converted using `IP.To4` method.
 func (me *IPv4Matcher) Match(ipv4 net.IP) bool {
 	if len(ipv4) != net.IPv4len {
 		return false
@@ -145,6 +151,8 @@ func (me *IPv4Matcher) Match(ipv4 net.IP) bool {
 	return me.matcher.Match(bitset(ipv4))
 }
 
+// Add a ipv4 subnet to matcher, with network `ipv4` and prefix length `plen`.
+// NOTE: please use 4 byte net.IP, net.IP4 returns 16 byte version, which can be converted using `IP.To4` method.
 func (me *IPv4Matcher) Add(ipv4 net.IP, plen int) {
 	if len(ipv4) != net.IPv4len || plen > net.IPv4len<<3 {
 		return
@@ -152,6 +160,7 @@ func (me *IPv4Matcher) Add(ipv4 net.IP, plen int) {
 	me.matcher.Add(bitset(ipv4), plen)
 }
 
+// Try to match an IPv6 address, returns true if the address is in one of its subnet, false otherwise.
 func (me *IPv6Matcher) Match(ipv6 net.IP) bool {
 	if len(ipv6) != net.IPv6len {
 		return false
@@ -159,6 +168,7 @@ func (me *IPv6Matcher) Match(ipv6 net.IP) bool {
 	return me.matcher.Match(bitset(ipv6))
 }
 
+// Add a ipv6 subnet to matcher, with network `ipv6` and prefix length `plen`.
 func (me *IPv6Matcher) Add(ipv6 net.IP, plen int) {
 	if len(ipv6) != net.IPv6len || plen > net.IPv6len<<3 {
 		return
@@ -166,6 +176,7 @@ func (me *IPv6Matcher) Add(ipv6 net.IP, plen int) {
 	me.matcher.Add(bitset(ipv6), plen)
 }
 
+// Add a ipv4 subnet using IPNet interface. You can get it using net.ParseCIDR.
 func (me *IPv4Matcher) AddNet(ipnet *net.IPNet) {
 	if ipnet == nil {
 		return
@@ -177,6 +188,7 @@ func (me *IPv4Matcher) AddNet(ipnet *net.IPNet) {
 	}
 }
 
+// Add a ipv6 subnet using IPNet interface. You can get it using net.ParseCIDR.
 func (me *IPv6Matcher) AddNet(ipnet *net.IPNet) {
 	if ipnet == nil {
 		return

@@ -202,30 +202,30 @@ func randomV6() net.IP {
 }
 
 func BenchmarkChnRoute(b *testing.B) {
-	test_ip4s := make([]net.IP, RandSize)
+	testIP4s := make([]net.IP, RandSize)
 	for i := 0; i < RandSize; i++ {
-		test_ip4s[i] = randomV4()
+		testIP4s[i] = randomV4()
 	}
 	b.ResetTimer()
 	b.StopTimer()
 	for i := 0; i < b.N; i++ {
 		r := getChnRoute(b)
-		for _, ip4 := range test_ip4s {
+		for _, ip4 := range testIP4s {
 			r.Match(ip4)
 		}
 	}
 }
 
 func BenchmarkChnRoute6(b *testing.B) {
-	test_ip6s := make([]net.IP, RandSize)
+	testIP6s := make([]net.IP, RandSize)
 	for i := 0; i < RandSize; i++ {
-		test_ip6s[i] = randomV6()
+		testIP6s[i] = randomV6()
 	}
 	b.StopTimer()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		r := getChnRoute6(b)
-		for _, ip6 := range test_ip6s {
+		for _, ip6 := range testIP6s {
 			r.Match(ip6)
 		}
 	}
