@@ -143,7 +143,7 @@ func (me *matcher) Add(ip bitset, plen int) {
 }
 
 // Match tries to match an IPv4 address, returns true if the address is in one of its subnet, false otherwise.
-// NOTE: please use 4 byte net.IP, net.IP4 returns 16 byte version, which can be converted using `IP.To4` method.
+// NOTE: please use 4 byte net.IP, net.IPv4 returns 16 byte version, which can be converted using `IP.To4` method.
 func (me *IPv4Matcher) Match(ipv4 net.IP) bool {
 	if len(ipv4) != net.IPv4len {
 		return false
@@ -152,7 +152,7 @@ func (me *IPv4Matcher) Match(ipv4 net.IP) bool {
 }
 
 // Add a ipv4 subnet to matcher, with network `ipv4` and prefix length `plen`.
-// NOTE: please use 4 byte net.IP, net.IP4 returns 16 byte version, which can be converted using `IP.To4` method.
+// NOTE: please use 4 byte net.IP, net.IPv4 returns 16 byte version, which can be converted using `IP.To4` method.
 func (me *IPv4Matcher) Add(ipv4 net.IP, plen int) {
 	if len(ipv4) != net.IPv4len || plen > net.IPv4len<<3 {
 		return
